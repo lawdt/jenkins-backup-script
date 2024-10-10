@@ -31,16 +31,21 @@ function backup_jobs() {
       [ "${job_name}" = "." ] && continue
       [ "${job_name}" = ".." ] && continue
       [ -d "${JENKINS_HOME}/jobs/${rel_depth}/${job_name}" ] && mkdir -p "${ARC_DIR}/jobs/${rel_depth}/${job_name}/"
-      find "${JENKINS_HOME}/jobs/${rel_depth}/${job_name}/" -maxdepth 1  \( -name "*.xml" -o -name "nextBuildNumber" \) -print0 | xargs -0 -I {} cp {} "${ARC_DIR}/jobs/${rel_depth}/${job_name}/"
-      if [ -f "${JENKINS_HOME}/jobs/${rel_depth}/${job_name}/config.xml" ] && [ "$(grep -c "com.cloudbees.hudson.plugins.folder.Folder" "${JENKINS_HOME}/jobs/${rel_depth}/${job_name}/config.xml")" -ge 1 ] ; then
-        #echo "Folder! $JENKINS_HOME/jobs/$rel_depth/$job_name/jobs"
+      
+      # Копирование конфигурационных файлов (как и раньше)
+      find "${JENKINS_HOME}/jobs/${rel_depth}/${job_name}/" -maxdepth 1 \( -name "*.xml" -o -name "nextBuildNumber" \) -print0 | xargs -0 -I {} cp {} "${ARC_DIR}/jobs/${rel_depth}/${job_name}/"
+      
+      # Копирование папки builds без артефактов
+      if [ -d "${JENKINS_HOME}/jobs/${rel_depth}/${job_name}/builds" ]; then
+        mkdir -p "${ARC_DIR}/jobs/${rel_depth}/${job_name}/builds"
+        rsync -a --exclude='archive/**' "${JENKINS_HOME}/jobs/${rel_depth}/${job_name}/builds/" "${ARC_DIR}/jobs/${rel_depth}/${job_name}/builds/"
+      fi
+      
+      # Если это папка, рекурсивно вызываем backup_jobs
+      if [ -f "${JENKINS_HOME}/jobs/${rel_depth}/${job_name}/config.xml" ] && [ "$(grep -c "com.cloudbees.hudson.plugins.folder.Folder" "${JENKINS_HOME}/jobs/${rel_depth}/${job_name}/config.xml")" -ge 1 ]; then
         backup_jobs "${JENKINS_HOME}/jobs/${rel_depth}/${job_name}/jobs"
-      else
-        true
-        #echo "Job! $JENKINS_HOME/jobs/$rel_depth/$job_name"
       fi
     done
-    #echo "Done in $(pwd)"
     cd -
   fi
 }
