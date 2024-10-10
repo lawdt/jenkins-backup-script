@@ -12,11 +12,11 @@ readonly CUR_DIR=$(cd $(dirname ${BASH_SOURCE:-$0}); pwd)
 readonly TMP_DIR="${CUR_DIR}/tmp"
 readonly ARC_NAME="jenkins-backup"
 readonly ARC_DIR="${TMP_DIR}/${ARC_NAME}"
-readonly TMP_TAR_NAME="${TMP_DIR}/archive.tar.gz"
+readonly TMP_TAR_NAME="${TMP_DIR}/archive.zst"
 
 
 function usage() {
-  echo "usage: $(basename $0) /path/to/jenkins_home archive.tar.gz"
+  echo "usage: $(basename $0) /path/to/jenkins_home archive.zst"
 }
 
 
@@ -74,12 +74,9 @@ function main() {
     cp "${JENKINS_HOME}/"*.jks "${ARC_DIR}/"
   fi
 
-  cp "${JENKINS_HOME}/plugins/"*.[hj]pi "${ARC_DIR}/plugins"
-  hpi_pinned_count=$(find ${JENKINS_HOME}/plugins/ -name *.hpi.pinned | wc -l)
-  jpi_pinned_count=$(find ${JENKINS_HOME}/plugins/ -name *.jpi.pinned | wc -l)
-  if [ ${hpi_pinned_count} -ne 0 -o ${jpi_pinned_count} -ne 0 ]; then
-    cp "${JENKINS_HOME}/plugins/"*.[hj]pi.pinned "${ARC_DIR}/plugins"
-  fi
+  # if [ "$(ls -A ${JENKINS_HOME}/plugins/)" ]; then
+  # cp "${JENKINS_HOME}/plugins/"*.[hj]pi "${ARC_DIR}/plugins"
+  # fi
 
   if [ "$(ls -A ${JENKINS_HOME}/users/)" ]; then
     cp -R "${JENKINS_HOME}/users/"* "${ARC_DIR}/users"
@@ -97,10 +94,13 @@ function main() {
     backup_jobs ${JENKINS_HOME}/jobs/
   fi
 
+  # Упаковка с использованием zstd
   cd "${TMP_DIR}"
-  tar -czvf "${TMP_TAR_NAME}" "${ARC_NAME}/"*
+  zstd -r "${ARC_NAME}/" -o "${TMP_TAR_NAME}.zst"
   cd -
-  mv -f "${TMP_TAR_NAME}" "${DEST_FILE}"
+
+  mv -f "${TMP_TAR_NAME}.zst" "${DEST_FILE}"
+
 
   cleanup
 
