@@ -12,11 +12,11 @@ readonly CUR_DIR=$(cd $(dirname ${BASH_SOURCE:-$0}); pwd)
 readonly TMP_DIR="${CUR_DIR}/tmp"
 readonly ARC_NAME="jenkins-backup"
 readonly ARC_DIR="${TMP_DIR}/${ARC_NAME}"
-readonly TMP_TAR_NAME="${TMP_DIR}/archive.zst"
+readonly TMP_TAR_NAME="${TMP_DIR}/archive.tar.zst"
 
 
 function usage() {
-  echo "usage: $(basename $0) /path/to/jenkins_home archive.zst"
+  echo "usage: $(basename $0) /path/to/jenkins_home archive.tar.zst"
 }
 
 
@@ -94,12 +94,12 @@ function main() {
     backup_jobs ${JENKINS_HOME}/jobs/
   fi
 
-  # Упаковка с использованием zstd
+  # Упаковка с использованием tar и zstd
   cd "${TMP_DIR}"
-  zstd -r "${ARC_NAME}/" -o "${TMP_TAR_NAME}.zst"
+  tar -I zstd -cf "${TMP_TAR_NAME}" "${ARC_NAME}/"
   cd -
 
-  mv -f "${TMP_TAR_NAME}.zst" "${DEST_FILE}"
+  mv -f "${TMP_TAR_NAME}" "${DEST_FILE}"
 
 
   cleanup
