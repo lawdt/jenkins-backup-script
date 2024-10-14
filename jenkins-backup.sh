@@ -3,7 +3,7 @@
 # Jenkins backup script
 # https://github.com/sue445/jenkins-backup-script
 #
-# Usage: ./jenkins-backup.sh -j /path/to/jenkins_home -d /path/to/backup/archive.tar.zst [-p]
+# Usage: ./jenkins-backup.sh -j /path/to/jenkins_home -d /path/to/backup/archive.tar.zst [-p] [-k number_of_backups]
 
 readonly CUR_DIR=$(cd $(dirname "${BASH_SOURCE:-$0}"); pwd)
 readonly TMP_DIR="${CUR_DIR}/tmp"
@@ -14,19 +14,21 @@ readonly TMP_TAR_NAME="${TMP_DIR}/archive.tar.zst"
 JENKINS_HOME=""
 DEST_FILE=""
 COPY_PLUGINS=false  # Default: plugin backup disabled
+KEEP_BACKUPS=0      # Default: keep all backups
 
 function usage() {
-  echo "Usage: $(basename "$0") -j /path/to/jenkins_home -d /path/to/backup/archive.tar.zst [-p]"
+  echo "Usage: $(basename "$0") -j /path/to/jenkins_home -d /path/to/backup/archive.tar.zst [-p] [-k number_of_backups]"
   echo
   echo "Options:"
   echo "  -j   Path to Jenkins Home directory."
   echo "  -d   Path to backup archive."
   echo "  -p   Include plugins in the backup."
+  echo "  -k   Number of backups to keep. Older backups will be deleted."
   exit 1
 }
 
 # Parse arguments using getopts
-while getopts "j:d:p" opt; do
+while getopts "j:d:pk:" opt; do
   case ${opt} in
     j)
       JENKINS_HOME="$OPTARG"
@@ -36,6 +38,9 @@ while getopts "j:d:p" opt; do
       ;;
     p)
       COPY_PLUGINS=true
+      ;;
+    k)
+      KEEP_BACKUPS="$OPTARG"
       ;;
     *)
       usage
@@ -47,6 +52,22 @@ done
 if [[ -z "${JENKINS_HOME}" || -z "${DEST_FILE}" ]]; then
   usage
 fi
+
+# Function to remove old backups using find
+function cleanup_old_backups() {
+  local backup_dir
+  backup_dir=$(dirname "${DEST_FILE}")
+
+  # Find and sort backup files by modification time, limit to files older than the last KEEP_BACKUPS
+  local backups_to_remove
+  backups_to_remove=$(find "${backup_dir}" -maxdepth 1 -name "*.tar.zst" -type f -printf "%T@ %p\n" | sort -n | head -n -"${KEEP_BACKUPS}" | cut -d' ' -f2-)
+
+  if [ -n "${backups_to_remove}" ]; then
+    echo "Removing old backups:"
+    echo "${backups_to_remove}"
+    echo "${backups_to_remove}" | xargs rm -f
+  fi
+}
 
 function backup_jobs() {
   local run_in_path="$1"
@@ -84,8 +105,8 @@ function cleanup() {
 
 function main() {
   rm -rf "${ARC_DIR}" "${TMP_TAR_NAME}"
-  for plugin in jobs users secrets nodes; do
-    mkdir -p "${ARC_DIR}/${plugin}"
+  for fold in jobs users secrets nodes plugins; do
+    mkdir -p "${ARC_DIR}/${fold}"
   done
 
   cp "${JENKINS_HOME}/"*.xml "${ARC_DIR}"
@@ -125,6 +146,9 @@ function main() {
   cd -
 
   mv -f "${TMP_TAR_NAME}" "${DEST_FILE}"
+
+  # Clean up old backups if necessary
+  cleanup_old_backups
 
   cleanup
 
